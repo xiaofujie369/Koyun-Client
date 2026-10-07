@@ -1,15 +1,17 @@
 # 实现计划与验收记录
 
-## 当前状态（2026-10-07）
+## 当前状态（2026-10-08）
 
 已读取并归档 V3 需求。工作区初始为空，现已获取 FlClash 完整 Git 历史并创建
 `codex/platform-linux-mvp` 分支。尚未修改原客户端业务代码，尚未实现客户端真实 XBoard 联动。
-Rust 租户范围、License、离线宽限及 PanelAdapter 共 28 项测试通过，fmt 与 Clippy 通过。
+Rust 租户范围、License、离线宽限、PanelAdapter 与加密模块共 33 项测试通过，fmt 与 Clippy 通过。
 XBoardAdapter 已在 VPS 使用独立测试账号完成真实登录、稳定 ID 校验、权益和配置拉取。
 实际面板 user/info 已补充本人稳定数字 ID，原文件有私密备份，PHP 语法及真实接口验证通过。
 首个 GitHub Actions 工作流 37574552728 已通过：后端检查、Flutter analyze、Flutter test、
 Linux Release bundle 和开发产物上传。该产物仍是上游基础界面，并非完整托管客户端。
 公网入口仍需验证，平台 API、数据库、客户端托管界面与完整 E2E 尚未完成。
+数据库已有 20 张表的迁移、18 张表的 RLS 与令牌刷新事务函数；隔离、外键、重放、过期和
+撤销设备的 SQL 测试在独立 PostgreSQL 中通过。尚未连接 HTTP 接口或部署为平台数据库。
 
 本机 Flutter 3.38.3 / Dart 3.10.1；上游说明要求 Flutter 3.47.x，发布 CI 固定 3.47.4。
 Windows PATH 中未找到 cargo、rustc、docker。已发现现有 WSL 发行版，但未修改其配置或服务。
