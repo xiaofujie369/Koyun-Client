@@ -1,0 +1,75 @@
+name: Platform Linux
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-linux-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  platform:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --manifest-path platform/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path platform/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path platform/Cargo.toml --locked
+
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.4'
+          cache-dependency-path: core/go.sum
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            services/helper
+            plugins/rust_api/rust
+      - name: Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libayatana-appindicator3-dev libsecret-1-dev libxdo-dev
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - name: Flutter tests
+        run: |
+          cp pubspec.yaml /tmp/koyun-pubspec.yaml
+          trap 'cp /tmp/koyun-pubspec.yaml pubspec.yaml' EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('pubspec.yaml')
+          p.write_text(p.read_text().replace('setup:\n      build_assets: true', 'setup:\n      build_assets: false'))
+          PY
+          flutter test --reporter expanded
+      - name: Linux release bundle
+        run: flutter build linux --release
+      - name: Package development artifact
+        run: tar -C build/linux/x64/release/bundle -czf koyun-linux-x64-development.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: koyun-linux-x64-development
+          path: koyun-linux-x64-development.tar.gz
+          retention-days: 14
+          if-no-files-found: error

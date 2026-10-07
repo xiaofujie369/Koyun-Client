@@ -46,7 +46,14 @@ app.*.map.json
 .claude/worktrees/
 
 # Documentation (generated/planning artifacts)
-docs/
+docs/*
+!docs/platform/
+
+/.private/
+/platform/target/
+**/.env
+**/.env.*
+!**/.env.example
 
 
 # Android Studio will place build artifacts here
