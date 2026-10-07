@@ -4,9 +4,12 @@
 
 已读取并归档 V3 需求。工作区初始为空，现已获取 FlClash 完整 Git 历史并创建
 `codex/platform-linux-mvp` 分支。尚未修改原客户端业务代码，尚未实现客户端真实 XBoard 联动。
-Rust 租户范围、License 校验与离线宽限领域层已完成首批 9 项测试，fmt 与 Clippy 通过。
-已通过独立测试账号验证实际面板源站的登录、账户及订阅权益接口；公网入口仍需验证。
-已配置 GitHub Actions Linux 工作流，CI 结果单独记录，不把配置完成视为构建成功。
+Rust 租户范围、License、离线宽限及 PanelAdapter 共 28 项测试通过，fmt 与 Clippy 通过。
+XBoardAdapter 已在 VPS 使用独立测试账号完成真实登录、稳定 ID 校验、权益和配置拉取。
+实际面板 user/info 已补充本人稳定数字 ID，原文件有私密备份，PHP 语法及真实接口验证通过。
+首个 GitHub Actions 工作流 37574552728 已通过：后端检查、Flutter analyze、Flutter test、
+Linux Release bundle 和开发产物上传。该产物仍是上游基础界面，并非完整托管客户端。
+公网入口仍需验证，平台 API、数据库、客户端托管界面与完整 E2E 尚未完成。
 
 本机 Flutter 3.38.3 / Dart 3.10.1；上游说明要求 Flutter 3.47.x，发布 CI 固定 3.47.4。
 Windows PATH 中未找到 cargo、rustc、docker。已发现现有 WSL 发行版，但未修改其配置或服务。
@@ -65,7 +68,7 @@ Redis 用于限流与通知分发，不作为授权和同步版本的唯一事�
 
 ## 外部依赖
 
-- 已取得实际面板源码信息，建立普通测试账号；仍需解决稳定用户 ID 与公网 API 访问策略。
+- 已取得实际面板源码信息、普通测试账号并验证稳定用户 ID；公网 API 访问策略仍待解决。
 - 已取得部署主机；平台 API 的独立域名与 TLS 接入尚待配置。
 - origin 已配置为用户指定的 xiaofujie369/Koyun-Client，保留 FlClash 历史。
 - 真实 Linux 桌面上的本地导入、Core、TUN 与断网 E2E 验证。
