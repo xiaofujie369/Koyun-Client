@@ -18,11 +18,14 @@ use uuid::Uuid;
 pub struct ApiState {
     pub store: Arc<Store>,
     pub adapters: Arc<AdapterRegistry>,
+    pub bootstrap: Option<Arc<crate::bootstrap::BootstrapConfig>>,
 }
 
 pub fn router(state: ApiState) -> Router {
     Router::new()
         .route("/health", get(|| async { StatusCode::NO_CONTENT }))
+        .route("/v1/bootstrap", get(crate::bootstrap::bootstrap))
+        .route("/v1/public/brands/{id}", get(crate::bootstrap::brand))
         .route("/v1/public/tenants", get(tenants))
         .route("/v1/auth/login", post(login))
         .route("/v1/auth/refresh", post(refresh))
@@ -44,6 +47,8 @@ pub fn router(state: ApiState) -> Router {
         .route("/v1/sync/state", get(crate::api_managed::sync_state))
         .route("/v1/realtime/token", get(crate::realtime::ticket))
         .route("/v1/realtime/ws", get(crate::realtime::upgrade))
+        .route("/v1/app/policy", get(app_policy))
+        .route("/v1/notices", get(notices))
         .layer(DefaultBodyLimit::max(32 * 1024))
         .layer(axum::middleware::from_fn_with_state(
             Arc::new(crate::api_limits::Limits::default()),
@@ -259,5 +264,24 @@ async fn entitlement(
         .await?;
     Ok(Json(
         serde_json::json!({"data":{"expires_at":e.expires_at,"quota_bytes":e.quota_bytes,"upload_bytes":e.upload_bytes,"download_bytes":e.download_bytes,"device_limit":e.device_limit}}),
+    ))
+}
+
+async fn app_policy(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    Ok(Json(
+        serde_json::json!({"data":state.store.app_policy(&actor).await?}),
+    ))
+}
+async fn notices(
+    State(state): State<ApiState>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers).await?;
+    Ok(Json(
+        serde_json::json!({"data":state.store.notices(&actor).await?}),
     ))
 }

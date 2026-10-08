@@ -34,6 +34,22 @@ impl ProfileState {
 }
 
 impl Store {
+    pub async fn app_policy(&self, actor: &Principal) -> Result<serde_json::Value, StoreError> {
+        let mut tx = self.begin(&actor.tenant_id).await?;
+        let row=sqlx::query("SELECT t.policy_version,t.offline_grace_seconds,l.status,l.expires_at,l.grace_until,l.allow_realtime,l.allow_linux,l.allow_windows,l.allow_android FROM tenants t JOIN tenant_licenses l ON l.tenant_id=t.id WHERE t.id=$1")
+            .bind(actor.tenant_id.as_str()).fetch_one(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(
+            serde_json::json!({"tenant_id":actor.tenant_id.as_str(),"version":row.get::<i64,_>("policy_version"),"allow_local_mode":true,"offline_grace_seconds":row.get::<i32,_>("offline_grace_seconds"),"license_status":row.get::<String,_>("status"),"license_expires_at":row.get::<Option<DateTime<Utc>>,_>("expires_at"),"license_grace_until":row.get::<Option<DateTime<Utc>>,_>("grace_until"),"allow_realtime":row.get::<bool,_>("allow_realtime"),"allow_linux":row.get::<bool,_>("allow_linux"),"allow_windows":row.get::<bool,_>("allow_windows"),"allow_android":row.get::<bool,_>("allow_android")}),
+        )
+    }
+    pub async fn notices(&self, actor: &Principal) -> Result<Vec<serde_json::Value>, StoreError> {
+        let mut tx = self.begin(&actor.tenant_id).await?;
+        let rows=sqlx::query("SELECT id,title,body,published_at FROM notices WHERE tenant_id=$1 AND published_at<=now() ORDER BY published_at DESC,id DESC LIMIT 50")
+            .bind(actor.tenant_id.as_str()).fetch_all(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(rows.iter().map(|row|serde_json::json!({"id":row.get::<Uuid,_>("id"),"title":row.get::<String,_>("title"),"body":row.get::<String,_>("body"),"published_at":row.get::<DateTime<Utc>,_>("published_at")})).collect())
+    }
     pub async fn managed_state(&self, actor: &Principal) -> Result<ProfileState, StoreError> {
         let mut tx = self.begin(&actor.tenant_id).await?;
         let row=sqlx::query("INSERT INTO managed_profiles(id,tenant_id,account_id) VALUES($1,$2,$3) ON CONFLICT(tenant_id,account_id) DO UPDATE SET account_id=EXCLUDED.account_id RETURNING *")

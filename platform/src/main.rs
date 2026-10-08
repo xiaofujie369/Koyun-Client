@@ -25,8 +25,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Database migrations applied");
         return Ok(());
     }
-    if mode != "serve" {
-        return Err("Expected serve or migrate".into());
+    if mode != "serve" && mode != "signing-public-key" {
+        return Err("Expected serve, migrate or signing-public-key".into());
+    }
+    let bootstrap = std::env::var("BOOTSTRAP_SIGNING_KEY")
+        .ok()
+        .map(|seed| -> Result<_, Box<dyn std::error::Error>> {
+            Ok(Arc::new(
+                client_platform::bootstrap::BootstrapConfig::new(
+                    &seed,
+                    &std::env::var("BOOTSTRAP_KEY_ID")?,
+                    &std::env::var("PUBLIC_ORIGIN")?,
+                    TenantId::parse(&std::env::var("DEFAULT_TENANT_ID")?)
+                        .map_err(|_| "Invalid default tenant")?,
+                    std::env::var("DEFAULT_BRAND_ID")?.parse()?,
+                )
+                .map_err(|_| "Invalid bootstrap configuration")?,
+            ))
+        })
+        .transpose()?;
+    if mode == "signing-public-key" {
+        println!(
+            "{}",
+            bootstrap
+                .as_ref()
+                .ok_or("Bootstrap configuration required")?
+                .public_key()
+        );
+        return Ok(());
     }
     let url = std::env::var("DATABASE_URL")?;
     let key = MasterKey::from_hex(&std::env::var("PLATFORM_MASTER_KEY")?)
@@ -83,6 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         router(ApiState {
             store,
             adapters: Arc::new(adapters),
+            bootstrap,
         })
         .into_make_service_with_connect_info::<SocketAddr>(),
     )

@@ -19,15 +19,7 @@ pub enum CryptoError {
 
 impl MasterKey {
     pub fn from_hex(value: &str) -> Result<Self, CryptoError> {
-        if value.len() != 64 || !value.is_ascii() {
-            return Err(CryptoError::InvalidKey);
-        }
-        let mut bytes = Zeroizing::new([0u8; 32]);
-        for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
-            let byte = std::str::from_utf8(pair).map_err(|_| CryptoError::InvalidKey)?;
-            bytes[index] = u8::from_str_radix(byte, 16).map_err(|_| CryptoError::InvalidKey)?;
-        }
-        Ok(Self(bytes))
+        Ok(Self(decode_key(value)?))
     }
 
     pub fn encrypt(&self, plaintext: &[u8], context: &[u8]) -> Result<Vec<u8>, CryptoError> {
@@ -73,6 +65,18 @@ impl MasterKey {
             .map(Zeroizing::new)
             .map_err(|_| CryptoError::InvalidCiphertext)
     }
+}
+
+pub(crate) fn decode_key(value: &str) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
+    if value.len() != 64 || !value.is_ascii() {
+        return Err(CryptoError::InvalidKey);
+    }
+    let mut bytes = Zeroizing::new([0u8; 32]);
+    for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
+        let byte = std::str::from_utf8(pair).map_err(|_| CryptoError::InvalidKey)?;
+        bytes[index] = u8::from_str_radix(byte, 16).map_err(|_| CryptoError::InvalidKey)?;
+    }
+    Ok(bytes)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

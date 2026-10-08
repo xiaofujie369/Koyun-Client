@@ -123,8 +123,40 @@ async fn session_rotation_device_quota_and_tenant_isolation() {
     let app = router(ApiState {
         store: store.clone(),
         adapters: Arc::new(registry),
+        bootstrap: Some(Arc::new(
+            client_platform::bootstrap::BootstrapConfig::new(
+                &"22".repeat(32),
+                "test-root",
+                "https://api.example.com",
+                TenantId::parse("demo").unwrap(),
+                Uuid::parse_str("20000000-0000-0000-0000-000000000001").unwrap(),
+            )
+            .unwrap(),
+        )),
     });
     let device = Uuid::new_v4();
+    let (status, bootstrap) = call(&app, "GET", "/v1/bootstrap", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let payload = base64::Engine::decode(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        bootstrap["data"]["payload"].as_str().unwrap(),
+    )
+    .unwrap();
+    let signature = ed25519_dalek::Signature::from_slice(
+        &base64::Engine::decode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            bootstrap["data"]["signature"].as_str().unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    ed25519_dalek::SigningKey::from_bytes(&[0x22; 32])
+        .verifying_key()
+        .verify_strict(&payload, &signature)
+        .unwrap();
+    let payload: Value = serde_json::from_slice(&payload).unwrap();
+    assert_eq!(payload["features"]["local_mode"], true);
+    assert_eq!(payload["brand"]["app_name"], "Koyun Client");
     let (status, result) = call(&app, "POST", "/v1/auth/login", None, login("demo", device)).await;
     assert_eq!(status, StatusCode::OK, "login returned {result}");
     let access = result["data"]["access_token"].as_str().unwrap();

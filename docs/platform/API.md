@@ -1,7 +1,7 @@
 # API 开发联调
 
 当前服务具备登录、刷新、退出、设备注册/列表/撤销、租户用户和权益查询，
-以及托管配置、版本同步与 WebSocket 通知。签名 Bootstrap、管理后台和客户端接入
+以及托管配置、版本同步、WebSocket 通知与签名 Bootstrap。管理后台和客户端接入
 仍在开发，不能作为完整 MVP 上线。
 
 ## 启动
@@ -36,6 +36,8 @@ JSON 成功结果为 `{"data":…}`；业务错误为 `{"error":{"code":"…"}}`
 | 方法与路径 | 请求/行为 |
 |---|---|
 | GET `/health` | 204，进程存活检查，不代表数据库健康 |
+| GET `/v1/bootstrap` | Ed25519 签名的默认品牌启动配置 |
+| GET `/v1/public/brands/{id}` | 默认品牌的签名启动配置 |
 | GET `/v1/public/tenants` | 可登录的已启用租户列表 |
 | POST `/v1/auth/login` | `tenant_id,email,password,device` |
 | POST `/v1/auth/refresh` | `refresh_token`，一次性轮换 |
@@ -51,6 +53,8 @@ JSON 成功结果为 `{"data":…}`；业务错误为 `{"error":{"code":"…"}}`
 | GET `/v1/sync/state` | 配置/权益/策略版本、离线宽限、服务器时间 |
 | GET `/v1/realtime/token` | 60 秒有效的一次性 WebSocket 票据 |
 | WS `/v1/realtime/ws` | Authorization 使用一次性票据，不使用 access token |
+| GET `/v1/app/policy` | 租户许可、平台能力与离线宽限；本地模式始终允许 |
+| GET `/v1/notices` | 所属租户最近 50 条已发布公告 |
 
 设备对象包含 `installation_id`（安装时生成并持久保存的非空 UUID）、`name`、
 `platform`（linux/windows/android）和可选 `capabilities` 字符串数组。
@@ -82,6 +86,22 @@ WebSocket 连接必须先获取票据，再通过 Authorization 头发送。禁�
 断开。每进程最多 256 个连接，每会话最多 2 个连接，发送和数据库检查有 5 秒超时。
 连接重建必须获取新票据并先请求 sync/state；客户端仍须每 30 秒轮询以触发上游刷新
 并补偿漏消息。该阶段未接入 XBoard 节点 WS，也未用 Redis 代替数据库事实来源。
+
+## 签名 Bootstrap
+
+设置 `BOOTSTRAP_SIGNING_KEY`（独立随机 32 字节种子的十六进制编码，不复用数据库密钥）、
+`BOOTSTRAP_KEY_ID`、`PUBLIC_ORIGIN`（不带路径的 HTTPS origin）、`DEFAULT_TENANT_ID`、
+`DEFAULT_BRAND_ID`（已创建的品牌 UUID）。未配置签名密钥时 Bootstrap 返回 503。
+以这些环境变量运行 `client-platform signing-public-key` 可得到应嵌入客户端的
+Base64URL Ed25519 公钥，该命令不访问数据库。
+
+返回 data 包含 `key_id,payload,signature`；payload 与 signature 均为无填充 Base64URL。
+签名覆盖 payload 解码后的原始 UTF-8 JSON 字节，验证前不要重新序列化 JSON。
+客户端必须从内置可信公钥表按 key_id 选择公钥；不能相信响应自带的新公钥。
+签名成功后检查 format、内外 key_id、品牌 ID、版本回滚、issued_at、expires_at、HTTPS
+端点，以及本地模式始终开启。有效期为 24 小时，版本使用租户持久化 policy_version。
+品牌/端点策略改变时管理员必须增加该版本。此版每服务实例发布一个默认品牌，
+其他品牌返回 404；轮换信任根暂需发布包含新公钥的客户端。
 
 ## 独立数据库测试
 

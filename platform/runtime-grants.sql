@@ -7,3 +7,5 @@ GRANT SELECT (policy_version,offline_grace_seconds) ON tenants TO platform_api_r
 GRANT SELECT, INSERT, UPDATE ON managed_profiles, entitlements, realtime_events TO platform_api_runtime;
 GRANT SELECT, INSERT, DELETE ON profile_cache TO platform_api_runtime;
 GRANT SELECT, INSERT, UPDATE, DELETE ON realtime_tickets TO platform_api_runtime;
+GRANT SELECT ON brands TO platform_api_runtime;
+GRANT SELECT ON notices TO platform_api_runtime;
