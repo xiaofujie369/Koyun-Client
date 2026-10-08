@@ -1,7 +1,10 @@
 pub mod api;
 mod api_limits;
+mod api_managed;
 pub mod crypto;
 pub mod licensing;
+pub mod managed;
 pub mod panel;
+pub mod realtime;
 pub mod scope;
 pub mod store;

@@ -10,8 +10,8 @@ use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 pub struct Store {
-    pool: PgPool,
-    key: MasterKey,
+    pub(crate) pool: PgPool,
+    pub(crate) key: MasterKey,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -82,7 +82,10 @@ impl Store {
         Ok(Self { pool, key })
     }
 
-    async fn begin(&self, tenant: &TenantId) -> Result<Transaction<'_, Postgres>, StoreError> {
+    pub(crate) async fn begin(
+        &self,
+        tenant: &TenantId,
+    ) -> Result<Transaction<'_, Postgres>, StoreError> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("SELECT set_config('app.tenant_id',$1,true)")
             .bind(tenant.as_str())
@@ -113,7 +116,7 @@ impl Store {
             .iter().map(|r| serde_json::json!({"id":r.get::<String,_>("id"),"name":r.get::<String,_>("name"),"login_enabled":true})).collect())
     }
 
-    async fn license(
+    pub(crate) async fn license(
         tx: &mut Transaction<'_, Postgres>,
         tenant: &TenantId,
         platform: &str,

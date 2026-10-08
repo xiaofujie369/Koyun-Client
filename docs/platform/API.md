@@ -1,7 +1,8 @@
 # API 开发联调
 
-当前服务具备登录、刷新、退出、设备注册/列表/撤销、租户用户和权益查询。
-托管配置、同步通知、签名 Bootstrap 和管理后台仍未接入，不能作为完整 MVP 上线。
+当前服务具备登录、刷新、退出、设备注册/列表/撤销、租户用户和权益查询，
+以及托管配置、版本同步与 WebSocket 通知。签名 Bootstrap、管理后台和客户端接入
+仍在开发，不能作为完整 MVP 上线。
 
 ## 启动
 
@@ -44,6 +45,12 @@ JSON 成功结果为 `{"data":…}`；业务错误为 `{"error":{"code":"…"}}`
 | DELETE `/v1/devices/{id}` | 撤销所属设备及全部会话，204 |
 | GET `/v1/tenants/{id}/me` | 当前面板身份，拒绝跨租户路径 |
 | GET `/v1/tenants/{id}/entitlement` | 当前面板权益 |
+| GET `/v1/managed/profiles` | 当前账号唯一托管配置的元数据 |
+| GET `/v1/managed/profiles/{id}` | YAML；支持 If-None-Match 与 304 |
+| GET `/v1/managed/profiles/{id}/state` | 配置状态、版本、ETag、同步时间 |
+| GET `/v1/sync/state` | 配置/权益/策略版本、离线宽限、服务器时间 |
+| GET `/v1/realtime/token` | 60 秒有效的一次性 WebSocket 票据 |
+| WS `/v1/realtime/ws` | Authorization 使用一次性票据，不使用 access token |
 
 设备对象包含 `installation_id`（安装时生成并持久保存的非空 UUID）、`name`、
 `platform`（linux/windows/android）和可选 `capabilities` 字符串数组。
@@ -56,6 +63,26 @@ access 默认 15 分钟，会话族最长 30 天；刷新不会延长会话族�
 401 要求重新登录；403 是明确授权拒绝；409 表示设备额度不足；429 根据 Retry-After
 退避；503/502 表示平台或面板暂不可用。JSON 解析错误使用 Axum 的 4xx 响应。
 
+## 配置与通知
+
+访问配置或同步状态时，距上次成功同步超过 30 秒会重新查询面板身份、权益和订阅。
+缓存按租户/账号/配置隔离，配置正文使用 AEAD 加密，密文绑定租户、配置 ID 和版本。
+相同内容不增加版本；内容变化或从暂停状态恢复会增加版本，并写入事务内事件记录。
+服务端保留最近版本用于恢复，不能代替客户端经 mihomo 验证和成功应用后的 LKG。
+较早发起的请求不得覆盖较新成功响应或明确暂停状态。
+
+面板网络故障或无效配置返回 502，保留最近成功缓存；明确身份/权益拒绝返回 401/403，
+暂停托管配置。客户端只能对临时故障使用有期限的 LKG，不能对明确拒绝使用离线宽限。
+YAML 响应携带 `ETag` 和 `X-Profile-Version`，仍标记 no-store 以禁止共享 HTTP 缓存。
+
+WebSocket 连接必须先获取票据，再通过 Authorization 头发送。禁止将令牌放入 URL
+或日志。连接后首个事件为 `sync.required`；随后按数据库版本变化发送
+`profile.changed`、`entitlement.changed`、`tenant.policy.changed`，不发送配置正文。
+当前 DatabaseRealtimeProvider 每 2 秒检查版本和会话有效性，退出、撤销、许可失效后
+断开。每进程最多 256 个连接，每会话最多 2 个连接，发送和数据库检查有 5 秒超时。
+连接重建必须获取新票据并先请求 sync/state；客户端仍须每 30 秒轮询以触发上游刷新
+并补偿漏消息。该阶段未接入 XBoard 节点 WS，也未用 Redis 代替数据库事实来源。
+
 ## 独立数据库测试
 
 在一次性 `platform_api_test` 数据库运行迁移，再执行 `platform/tests/api_setup.sql`。
@@ -66,4 +93,6 @@ cargo test --manifest-path platform/Cargo.toml --test api -- --ignored
 ```
 
 测试覆盖真实 HTTP Router 与 PostgreSQL、刷新重放撤销、并发额度、跨租户拒绝、
-设备撤销、注册、退出及连接池租户范围清理。每次执行使用全新测试数据库。
+设备撤销、注册、退出及连接池租户范围清理；同时检查配置 ETag、失败保留缓存、
+明确拒绝暂停、旧响应竞争、一次性票据及真实 WebSocket 撤销断连。
+每次执行使用全新测试数据库。

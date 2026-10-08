@@ -5,3 +5,4 @@ INSERT INTO tenants(id,slug,name,status,panel_type) VALUES ('demo','demo','Demo'
 INSERT INTO tenant_licenses(id,tenant_id,status,starts_at)
 VALUES ('10000000-0000-0000-0000-000000000001','demo','active',now()-interval '1 hour'),
 ('10000000-0000-0000-0000-000000000002','other','active',now()-interval '1 hour');
+UPDATE tenant_licenses SET allow_realtime=true;

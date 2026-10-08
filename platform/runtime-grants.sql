@@ -3,3 +3,7 @@ GRANT SELECT (id,name,status,panel_type,panel_base_url,default_device_limit), UP
 GRANT SELECT ON tenant_licenses TO platform_api_runtime;
 GRANT SELECT, INSERT, UPDATE ON managed_accounts, devices, sessions, refresh_tokens TO platform_api_runtime;
 GRANT EXECUTE ON FUNCTION rotate_refresh_token(bytea,bytea,uuid,bytea,timestamptz) TO platform_api_runtime;
+GRANT SELECT (policy_version,offline_grace_seconds) ON tenants TO platform_api_runtime;
+GRANT SELECT, INSERT, UPDATE ON managed_profiles, entitlements, realtime_events TO platform_api_runtime;
+GRANT SELECT, INSERT, DELETE ON profile_cache TO platform_api_runtime;
+GRANT SELECT, INSERT, UPDATE, DELETE ON realtime_tickets TO platform_api_runtime;

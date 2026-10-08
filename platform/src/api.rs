@@ -32,6 +32,18 @@ pub fn router(state: ApiState) -> Router {
         .route("/v1/devices/{id}", delete(revoke))
         .route("/v1/tenants/{id}/me", get(me))
         .route("/v1/tenants/{id}/entitlement", get(entitlement))
+        .route("/v1/managed/profiles", get(crate::api_managed::profiles))
+        .route(
+            "/v1/managed/profiles/{id}",
+            get(crate::api_managed::content),
+        )
+        .route(
+            "/v1/managed/profiles/{id}/state",
+            get(crate::api_managed::profile_state),
+        )
+        .route("/v1/sync/state", get(crate::api_managed::sync_state))
+        .route("/v1/realtime/token", get(crate::realtime::ticket))
+        .route("/v1/realtime/ws", get(crate::realtime::upgrade))
         .layer(DefaultBodyLimit::max(32 * 1024))
         .layer(axum::middleware::from_fn_with_state(
             Arc::new(crate::api_limits::Limits::default()),
@@ -90,7 +102,7 @@ impl From<PanelError> for ApiError {
     }
 }
 
-async fn actor(state: &ApiState, headers: &HeaderMap) -> Result<Principal, ApiError> {
+pub(crate) async fn actor(state: &ApiState, headers: &HeaderMap) -> Result<Principal, ApiError> {
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
